@@ -199,58 +199,33 @@ for mnemonic in pairs(mnemonic_to_class_code) do
 end
 
 
-
-
-
-local RAM_sizes = {					--There will eventually be more modules, but they will all share the same ram address
+local supported_models = {					--There will eventually be more modules, but they will all share the ram address
 	[ "Armatoste 2K" ] = { ram_x = 64, ram_y = 115, ram_width = 128, ram_height = 16 },
 	[ "Armatoste 4K" ] = { ram_x = 64, ram_y = 115, ram_width = 128, ram_height = 32 },
 	[ "Armatoste 8K" ] = { ram_x = 64, ram_y = 115, ram_width = 128, ram_height = 64 },
 }
 
 
-	
-
-
-local function flash(model, target, opcodes)		
-
-		--Only thing i did was change "id"
-	local x, y = detect.cpu(model, target)
-	local model_data = RAM_sizes[model]
+local function flash(model, target, opcodes)
+	local x = supported_models[model].ram_x
+	local y = supported_models[model].ram_y
+	local model_data = supported_models[model]
 	local space_available = model_data.ram_width * model_data.ram_height
-	
-	if not x then
-		return
-	end
-
 	if #opcodes >= space_available then
 		printf.err("out of space; code takes %i cells, only have %i", #opcodes + 1, space_available)
 		return
 	end
 
 	for row = 0, model_data.ram_height - 1 do
-		local skipped = 0
-		for column = 0, model_data.ram_width - 1 do
-			while true do
-				local id = sim.partID(x + model_data.ram_x + column - skipped, y - row + model_data.ram_y)
-				if id and sim.partProperty(id, "type") ~= elem.DEFAULT_PT_FILT then
-					id = nil
-				end
-				if id then
-					local index = row * model_data.ram_width + column
-					local opcode = opcodes[index] and opcodes[index].dwords[1] or nop.dwords[1]
-					sim.partProperty(id, "ctype", opcode)
-					break
-				end
-				if skipped > 0 then
-					printf.err("RAM layout sanity check failed")
-					return
-				end
-				skipped = 1
-			end
+		for column = 0, model_data.ram_width - 1 do			
+			local id = sim.partID(x + model_data.ram_x - column, y + row + model_data.ram_y)
+			local index = row * model_data.ram_width + column
+			local opcode = opcodes[index] and opcodes[index].dwords[1] or nop.dwords[1]
+			sim.partProperty(id, "ctype", opcode)
 		end
 	end
 end
+
 
 return {
 	includes = includes,
